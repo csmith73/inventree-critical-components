@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventree-critical-components"
+version = "1.0.0"
+description = "Critical Components Plugin for InvenTree - Track and display critical components organized by category"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "InvenTree Critical Components Plugin"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Plugins",
+    "Framework :: Django",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+]
+keywords = ["inventree", "plugin", "critical-components", "inventory", "tracking"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/csmith73/inventree-critical-components"
+Documentation = "https://github.com/csmith73/inventree-critical-components#readme"
+Repository = "https://github.com/csmith73/inventree-critical-components"
+
+[project.entry-points."inventree_plugins"]
+CriticalComponentsPlugin = "inventree_critical_components.critical_components_plugin:CriticalComponentsPlugin"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"inventree_critical_components" = ["static/**/*"]
