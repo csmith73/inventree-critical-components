@@ -27,6 +27,7 @@ import {
   IconList,
   IconMapPin,
   IconX,
+  IconBoxOff,
 } from "@tabler/icons-react";
 import { checkPluginVersion, type InvenTreePluginContext } from "@inventreedb/ui";
 
@@ -202,6 +203,15 @@ function CriticalComponentsPanel({
               leftSection={<IconAlertTriangle size={12} />}
             >
               {data.total_critical_low_stock} Low Stock
+            </Badge>
+          )}
+          {(data.total_out_of_stock ?? 0) > 0 && (
+            <Badge
+              color="red"
+              size="lg"
+              leftSection={<IconBoxOff size={12} />}
+            >
+              {data.total_out_of_stock} Out of Stock
             </Badge>
           )}
         </Group>

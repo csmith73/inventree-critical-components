@@ -169,26 +169,28 @@ export function filterParts(parts: CriticalPart[], searchTerm: string): Critical
 }
 
 /**
- * Filter flat parts list to only show low stock parts
+ * Filter flat parts list to only show low stock and out of stock parts
  */
 export function filterLowStockParts(parts: CriticalPart[]): CriticalPart[] {
-  return parts.filter((part) => part.is_low_stock);
+  return parts.filter((part) => part.is_low_stock || (part.total_stock ?? 0) <= 0);
 }
 
 /**
- * Filter groups to only show low stock parts, removing empty groups
+ * Filter groups to only show low stock and out of stock parts, removing empty groups
  */
 export function filterGroupsLowStockOnly(groups: GroupNode[]): GroupNode[] {
   function filterGroup(group: GroupNode): GroupNode | null {
-    // Filter parts that are low stock
-    const lowStockParts = group.parts.filter((part) => part.is_low_stock);
+    // Filter parts that are low stock or out of stock
+    const lowStockParts = group.parts.filter(
+      (part) => part.is_low_stock || (part.total_stock ?? 0) <= 0
+    );
 
     // Recursively filter children
     const filteredChildren = group.children
       .map(filterGroup)
       .filter((child): child is GroupNode => child !== null);
 
-    // Return group if it has low stock parts or filtered children
+    // Return group if it has low stock/out of stock parts or filtered children
     if (lowStockParts.length > 0 || filteredChildren.length > 0) {
       return {
         ...group,

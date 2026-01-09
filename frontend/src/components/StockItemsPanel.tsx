@@ -1,6 +1,6 @@
 // Stock Items Panel Component - displays expanded stock item details
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Anchor, Box, Table, Text } from "@mantine/core";
 import type { InvenTreePluginContext } from "@inventreedb/ui";
 import type { StockItem } from "../types";
@@ -12,6 +12,22 @@ interface StockItemsPanelProps {
 }
 
 export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
+  // Determine if we should show serial and notes columns based on data
+  const { hasSerial, hasNotes } = useMemo(() => {
+    let hasSerial = false;
+    let hasNotes = false;
+    for (const item of stockItems) {
+      if (item.serial && item.serial.trim() !== "") {
+        hasSerial = true;
+      }
+      if (item.notes && item.notes.trim() !== "") {
+        hasNotes = true;
+      }
+      if (hasSerial && hasNotes) break;
+    }
+    return { hasSerial, hasNotes };
+  }, [stockItems]);
+
   if (!stockItems || stockItems.length === 0) {
     return (
       <Box px="md" py="sm" bg="gray.0">
@@ -33,10 +49,12 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Location</Table.Th>
+            {hasSerial && <Table.Th>Serial</Table.Th>}
             <Table.Th style={{ textAlign: "right" }}>Quantity</Table.Th>
             <Table.Th>Last Updated</Table.Th>
             <Table.Th>Stocktake Date</Table.Th>
             <Table.Th>Status</Table.Th>
+            {hasNotes && <Table.Th>Notes</Table.Th>}
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -55,6 +73,13 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                   {item.location_path || item.location}
                 </Anchor>
               </Table.Td>
+              {hasSerial && (
+                <Table.Td>
+                  <Text size="sm" fw={500}>
+                    {item.serial || "-"}
+                  </Text>
+                </Table.Td>
+              )}
               <Table.Td style={{ textAlign: "right" }}>
                 <Text size="sm" fw={500}>
                   {item.quantity}
@@ -75,6 +100,13 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                   {item.status}
                 </Text>
               </Table.Td>
+              {hasNotes && (
+                <Table.Td>
+                  <Text size="sm" c="dimmed" lineClamp={2}>
+                    {item.notes || "-"}
+                  </Text>
+                </Table.Td>
+              )}
             </Table.Tr>
           ))}
         </Table.Tbody>

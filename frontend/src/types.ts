@@ -13,6 +13,7 @@ export interface StockItem {
   updated: string | null;
   stocktake_date: string | null;
   url: string;
+  notes?: string;
 }
 
 // Stock location summary
@@ -64,6 +65,7 @@ export interface CriticalComponentsData {
   total_parts: number;
   total_entries?: number;
   total_critical_low_stock: number;
+  total_out_of_stock?: number;
 }
 
 // Group by type

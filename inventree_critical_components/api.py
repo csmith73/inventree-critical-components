@@ -155,6 +155,7 @@ def get_stock_items_for_part(part):
             'updated': item.updated.isoformat() if item.updated else None,
             'stocktake_date': item.stocktake_date.isoformat() if item.stocktake_date else None,
             'url': f'/stock/item/{item.pk}/',
+            'notes': item.notes or '',
         })
     
     return items
@@ -306,28 +307,32 @@ def build_category_hierarchy(parts):
 
 
 def count_parts_in_categories(categories):
-    """Count total parts and low stock parts in category hierarchy.
+    """Count total parts, low stock parts, and out of stock parts in category hierarchy.
     
     Args:
         categories: List of category dicts from build_category_hierarchy
         
     Returns:
-        Tuple of (total_parts, low_stock_count)
+        Tuple of (total_parts, low_stock_count, out_of_stock_count)
     """
     total = 0
     low_stock = 0
+    out_of_stock = 0
     
     def count_recursive(cat_list):
-        nonlocal total, low_stock
+        nonlocal total, low_stock, out_of_stock
         for cat in cat_list:
             for part in cat['parts']:
                 total += 1
-                if part.get('is_low_stock', False):
+                stock = part.get('total_stock', 0)
+                if stock <= 0:
+                    out_of_stock += 1
+                elif part.get('is_low_stock', False):
                     low_stock += 1
             count_recursive(cat['children'])
     
     count_recursive(categories)
-    return total, low_stock
+    return total, low_stock, out_of_stock
 
 
 def serialize_part_for_location(part, location_id, quantity_at_location):
@@ -648,14 +653,22 @@ class CriticalComponentsListView(APIView):
             # Build flat list of all parts
             parts_list = build_flat_parts_list(parts)
             
-            # Count low stock
-            low_stock_count = sum(1 for p in parts_list if p.get('is_low_stock', False))
+            # Count low stock and out of stock
+            low_stock_count = 0
+            out_of_stock_count = 0
+            for p in parts_list:
+                stock = p.get('total_stock', 0)
+                if stock <= 0:
+                    out_of_stock_count += 1
+                elif p.get('is_low_stock', False):
+                    low_stock_count += 1
             
             return Response({
                 'group_by': 'all',
                 'parts': parts_list,
                 'total_parts': len(parts_list),
                 'total_critical_low_stock': low_stock_count,
+                'total_out_of_stock': out_of_stock_count,
             })
         elif group_by == 'location':
             # Build location hierarchy
@@ -676,13 +689,14 @@ class CriticalComponentsListView(APIView):
             categories = build_category_hierarchy(parts)
             
             # Count totals
-            total_parts, low_stock_count = count_parts_in_categories(categories)
+            total_parts, low_stock_count, out_of_stock_count = count_parts_in_categories(categories)
             
             return Response({
                 'group_by': 'category',
                 'categories': categories,
                 'total_parts': total_parts,
                 'total_critical_low_stock': low_stock_count,
+                'total_out_of_stock': out_of_stock_count,
             })
 
 
