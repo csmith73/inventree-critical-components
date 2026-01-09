@@ -12,7 +12,13 @@ from rest_framework.views import APIView
 
 import structlog
 
-from common.models import Parameter, ParameterTemplate
+# Backward-compatible imports for Parameter and ParameterTemplate
+# In InvenTree >= 1.2.0, these models were moved to common.models
+# In InvenTree < 1.2.0 (e.g., 1.1.7), they are in part.models with different names
+try:
+    from common.models import Parameter, ParameterTemplate
+except ImportError:
+    from part.models import PartParameter as Parameter, PartParameterTemplate as ParameterTemplate
 from part.models import Part, PartCategory
 from plugin import registry
 from stock.models import StockItem, StockLocation
