@@ -15,7 +15,7 @@ import structlog
 from common.models import Parameter, ParameterTemplate
 from part.models import Part, PartCategory
 from plugin import registry
-from stock.models import StockItem
+from stock.models import StockItem, StockLocation
 
 logger = structlog.get_logger('inventree')
 
@@ -294,13 +294,217 @@ def count_parts_in_categories(categories):
     return total, low_stock
 
 
+def serialize_part_for_location(part, location_id, quantity_at_location):
+    """Serialize a part object for the location view.
+    
+    Args:
+        part: Part instance
+        location_id: The specific location ID
+        quantity_at_location: Stock quantity at this specific location
+        
+    Returns:
+        Dict with part data including location-specific quantity
+    """
+    plugin = get_plugin()
+    show_low_stock = plugin.get_setting('SHOW_LOW_STOCK_WARNING', backup_value=True)
+    
+    # Get total stock (for overall status)
+    total_stock = part.total_stock
+    minimum_stock = float(part.minimum_stock) if part.minimum_stock else 0
+    
+    # Determine low stock status based on total stock
+    is_low_stock = False
+    if show_low_stock and minimum_stock > 0:
+        is_low_stock = float(total_stock) < minimum_stock
+    
+    # Get image URLs
+    image_url = None
+    thumbnail_url = None
+    if part.image:
+        image_url = part.image.url
+        try:
+            if hasattr(part, 'get_thumbnail_url'):
+                thumbnail_url = part.get_thumbnail_url()
+            else:
+                thumbnail_url = image_url
+        except Exception:
+            thumbnail_url = image_url
+    
+    data = {
+        'id': part.pk,
+        'name': part.name,
+        'IPN': part.IPN or '',
+        'description': part.description or '',
+        'image': image_url,
+        'thumbnail': thumbnail_url or image_url,
+        'total_stock': float(total_stock),
+        'quantity_at_location': float(quantity_at_location),
+        'minimum_stock': minimum_stock,
+        'is_low_stock': is_low_stock,
+        'trackable': part.trackable,
+        'url': f'/part/{part.pk}/',
+    }
+    
+    return data
+
+
+def build_location_hierarchy(parts):
+    """Organize parts into a nested stock location structure.
+    
+    Args:
+        parts: QuerySet or list of Part objects
+        
+    Returns:
+        List of root location dicts with nested children and parts
+    """
+    # Map to track all locations we've seen
+    location_map = {}  # {location_id: location_data}
+    root_locations = []
+    
+    # Create a cache of parts for quick lookup
+    parts_cache = {part.pk: part for part in parts}
+    
+    # Get all stock items for critical parts grouped by location
+    stock_items = StockItem.objects.filter(
+        part__in=parts_cache.keys()
+    ).filter(
+        StockItem.IN_STOCK_FILTER
+    ).select_related('location', 'part').values(
+        'part_id',
+        'location_id',
+        'location__name',
+        'location__pathstring'
+    ).annotate(
+        total_quantity=Sum('quantity')
+    )
+    
+    # Group stock items by location
+    location_parts = {}  # {location_id: [(part_id, quantity), ...]}
+    for item in stock_items:
+        loc_id = item['location_id']
+        if loc_id not in location_parts:
+            location_parts[loc_id] = []
+        location_parts[loc_id].append({
+            'part_id': item['part_id'],
+            'quantity': float(item['total_quantity'] or 0),
+            'location_name': item['location__name'],
+            'location_pathstring': item['location__pathstring']
+        })
+    
+    # Process each location
+    for loc_id, parts_data in location_parts.items():
+        if loc_id is None:
+            # Handle stock with no location
+            if 'no_location' not in location_map:
+                no_location = {
+                    'id': None,
+                    'name': 'No Location',
+                    'pathstring': 'No Location',
+                    'icon': '',
+                    'parts': [],
+                    'children': []
+                }
+                location_map['no_location'] = no_location
+                root_locations.append(no_location)
+            
+            for part_data in parts_data:
+                part = parts_cache.get(part_data['part_id'])
+                if part:
+                    location_map['no_location']['parts'].append(
+                        serialize_part_for_location(part, None, part_data['quantity'])
+                    )
+        else:
+            # Get the location object to build hierarchy
+            try:
+                location = StockLocation.objects.get(pk=loc_id)
+                ancestors = list(location.get_ancestors(include_self=True))
+            except StockLocation.DoesNotExist:
+                continue
+            except Exception:
+                ancestors = []
+                continue
+            
+            # Build/update the location hierarchy
+            prev_children = root_locations
+            for ancestor in ancestors:
+                anc_id = ancestor.pk
+                
+                if anc_id not in location_map:
+                    location_data = {
+                        'id': anc_id,
+                        'name': ancestor.name,
+                        'pathstring': ancestor.pathstring or ancestor.name,
+                        'icon': getattr(ancestor, 'icon', '') or '',
+                        'parts': [],
+                        'children': []
+                    }
+                    location_map[anc_id] = location_data
+                    prev_children.append(location_data)
+                
+                prev_children = location_map[anc_id]['children']
+            
+            # Add parts to this specific location
+            for part_data in parts_data:
+                part = parts_cache.get(part_data['part_id'])
+                if part:
+                    location_map[loc_id]['parts'].append(
+                        serialize_part_for_location(part, loc_id, part_data['quantity'])
+                    )
+    
+    # Sort locations and parts
+    def sort_location(loc):
+        loc['children'] = sorted(loc['children'], key=lambda l: l['name'])
+        loc['parts'] = sorted(loc['parts'], key=lambda p: p['name'])
+        for child in loc['children']:
+            sort_location(child)
+    
+    root_locations = sorted(root_locations, key=lambda l: l['name'])
+    for loc in root_locations:
+        sort_location(loc)
+    
+    return root_locations
+
+
+def count_parts_in_locations(locations):
+    """Count total part entries and low stock parts in location hierarchy.
+    
+    Note: A part may appear in multiple locations, so this counts entries, not unique parts.
+    
+    Args:
+        locations: List of location dicts from build_location_hierarchy
+        
+    Returns:
+        Tuple of (total_entries, low_stock_count, unique_part_ids)
+    """
+    total = 0
+    low_stock = 0
+    unique_parts = set()
+    
+    def count_recursive(loc_list):
+        nonlocal total, low_stock
+        for loc in loc_list:
+            for part in loc['parts']:
+                total += 1
+                unique_parts.add(part['id'])
+                if part.get('is_low_stock', False):
+                    low_stock += 1
+            count_recursive(loc['children'])
+    
+    count_recursive(locations)
+    return total, low_stock, unique_parts
+
+
 class CriticalComponentsListView(APIView):
-    """API endpoint to get all critical components organized by category."""
+    """API endpoint to get all critical components organized by category or location."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Get all critical components organized by category hierarchy."""
+        """Get all critical components organized by category or location hierarchy.
+        
+        Query Parameters:
+            group_by: 'category' (default) or 'location'
+        """
         # Check permission to view parts
         if not request.user.has_perm('part.view_part'):
             return Response(
@@ -311,17 +515,36 @@ class CriticalComponentsListView(APIView):
         # Get critical parts
         parts = get_critical_parts()
         
-        # Build category hierarchy
-        categories = build_category_hierarchy(parts)
+        # Check grouping preference
+        group_by = request.query_params.get('group_by', 'category').lower()
         
-        # Count totals
-        total_parts, low_stock_count = count_parts_in_categories(categories)
-        
-        return Response({
-            'categories': categories,
-            'total_parts': total_parts,
-            'total_critical_low_stock': low_stock_count,
-        })
+        if group_by == 'location':
+            # Build location hierarchy
+            locations = build_location_hierarchy(parts)
+            
+            # Count totals
+            total_entries, low_stock_count, unique_parts = count_parts_in_locations(locations)
+            
+            return Response({
+                'group_by': 'location',
+                'locations': locations,
+                'total_entries': total_entries,
+                'total_parts': len(unique_parts),
+                'total_critical_low_stock': low_stock_count,
+            })
+        else:
+            # Build category hierarchy (default)
+            categories = build_category_hierarchy(parts)
+            
+            # Count totals
+            total_parts, low_stock_count = count_parts_in_categories(categories)
+            
+            return Response({
+                'group_by': 'category',
+                'categories': categories,
+                'total_parts': total_parts,
+                'total_critical_low_stock': low_stock_count,
+            })
 
 
 class CriticalComponentsStatsView(APIView):
