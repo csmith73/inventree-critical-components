@@ -21,7 +21,7 @@ The easiest way to install this plugin is through the InvenTree web interface:
 2. Click the **Install Plugin** button
 3. Enter the Git URL:
    ```
-   https://github.com/csmith73/inventree-critical-components
+   git+https://github.com/csmith73/inventree-critical-components.git
    ```
 4. Click **Install**
 5. Once installed, find the plugin in the list and toggle **Enable** to activate it
