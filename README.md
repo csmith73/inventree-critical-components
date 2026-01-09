@@ -13,6 +13,20 @@ A plugin for [InvenTree](https://inventree.org) that provides a dedicated view f
 
 ## Installation
 
+### Via InvenTree UI (Recommended)
+
+The easiest way to install this plugin is through the InvenTree web interface:
+
+1. Navigate to **Settings → Plugins** in InvenTree
+2. Click the **Install Plugin** button
+3. Enter the Git URL:
+   ```
+   https://github.com/csmith73/inventree-critical-components
+   ```
+4. Click **Install**
+5. Once installed, find the plugin in the list and toggle **Enable** to activate it
+6. Restart InvenTree when prompted (or restart the server manually)
+
 ### From Source (Development)
 
 1. Clone or download this plugin to your InvenTree plugins directory:
