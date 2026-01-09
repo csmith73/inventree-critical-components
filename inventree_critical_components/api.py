@@ -124,7 +124,7 @@ def get_stock_items_for_part(part):
             'location': item.location.name if item.location else 'No Location',
             'location_id': item.location.pk if item.location else None,
             'location_path': item.location.pathstring if item.location else '',
-            'status': str(item.status_label()),
+            'status': str(item.status_label),
             'updated': item.updated.isoformat() if item.updated else None,
             'stocktake_date': item.stocktake_date.isoformat() if item.stocktake_date else None,
             'url': f'/stock/item/{item.pk}/',
