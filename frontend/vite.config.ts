@@ -23,6 +23,10 @@ export default defineConfig({
     }),
     viteExternalsPlugin(externalLibs),
   ],
+  define: {
+    // Replace process.env.NODE_ENV at build time for browser compatibility
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   esbuild: {
     jsx: "preserve",
   },
