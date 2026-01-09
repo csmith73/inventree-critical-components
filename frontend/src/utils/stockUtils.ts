@@ -167,3 +167,40 @@ export function filterParts(parts: CriticalPart[], searchTerm: string): Critical
       part.category_path?.toLowerCase().includes(lowerSearch)
   );
 }
+
+/**
+ * Filter flat parts list to only show low stock parts
+ */
+export function filterLowStockParts(parts: CriticalPart[]): CriticalPart[] {
+  return parts.filter((part) => part.is_low_stock);
+}
+
+/**
+ * Filter groups to only show low stock parts, removing empty groups
+ */
+export function filterGroupsLowStockOnly(groups: GroupNode[]): GroupNode[] {
+  function filterGroup(group: GroupNode): GroupNode | null {
+    // Filter parts that are low stock
+    const lowStockParts = group.parts.filter((part) => part.is_low_stock);
+
+    // Recursively filter children
+    const filteredChildren = group.children
+      .map(filterGroup)
+      .filter((child): child is GroupNode => child !== null);
+
+    // Return group if it has low stock parts or filtered children
+    if (lowStockParts.length > 0 || filteredChildren.length > 0) {
+      return {
+        ...group,
+        parts: lowStockParts,
+        children: filteredChildren,
+      };
+    }
+
+    return null;
+  }
+
+  return groups
+    .map(filterGroup)
+    .filter((group): group is GroupNode => group !== null);
+}

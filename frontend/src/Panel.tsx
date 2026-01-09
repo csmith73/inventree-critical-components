@@ -12,6 +12,7 @@ import {
   Paper,
   SegmentedControl,
   Stack,
+  Switch,
   Text,
   Title,
   Tooltip,
@@ -31,7 +32,7 @@ import { checkPluginVersion, type InvenTreePluginContext } from "@inventreedb/ui
 
 import { LocalizedComponent } from "./locale";
 import type { CriticalComponentsData, GroupByType } from "./types";
-import { filterGroups, getAllGroupIds } from "./utils";
+import { filterGroups, filterGroupsLowStockOnly, getAllGroupIds } from "./utils";
 import {
   AllPartsTable,
   GroupRenderer,
@@ -50,6 +51,7 @@ function CriticalComponentsPanel({
   const [searchValue, setSearchValue] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchValue, 300);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   // Fetch critical components data
   const { data, isLoading, isError, error } = useQuery<CriticalComponentsData>(
@@ -73,10 +75,14 @@ function CriticalComponentsPanel({
     return [];
   }, [data, groupBy]);
 
-  // Filter groups based on search
+  // Filter groups based on search and low stock filter
   const filteredGroups = useMemo(() => {
-    return filterGroups(groups, debouncedSearch);
-  }, [groups, debouncedSearch]);
+    let result = filterGroups(groups, debouncedSearch);
+    if (showLowStockOnly) {
+      result = filterGroupsLowStockOnly(result);
+    }
+    return result;
+  }, [groups, debouncedSearch, showLowStockOnly]);
 
   // All group IDs for expand/collapse all
   const allGroupIds = useMemo(() => {
@@ -261,6 +267,23 @@ function CriticalComponentsPanel({
                 </Tooltip>
               </>
             )}
+
+            {/* Low Stock Filter */}
+            <Divider orientation="vertical" />
+            <Tooltip label="Show only low stock items">
+              <Switch
+                checked={showLowStockOnly}
+                onChange={(event) => setShowLowStockOnly(event.currentTarget.checked)}
+                label="Low Stock Only"
+                size="xs"
+                color="orange"
+                thumbIcon={
+                  showLowStockOnly ? (
+                    <IconAlertTriangle size={10} color="orange" />
+                  ) : null
+                }
+              />
+            </Tooltip>
           </Group>
         </Group>
       </Paper>
@@ -280,6 +303,7 @@ function CriticalComponentsPanel({
           parts={data.parts ?? []}
           context={context}
           searchTerm={debouncedSearch}
+          showLowStockOnly={showLowStockOnly}
         />
       ) : (
         /* Grouped View (category or location) */

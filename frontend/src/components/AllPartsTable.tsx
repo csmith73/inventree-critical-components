@@ -5,7 +5,7 @@ import { ActionIcon, Box, Group, Paper, Text, Tooltip } from "@mantine/core";
 import { IconFileSpreadsheet } from "@tabler/icons-react";
 import type { InvenTreePluginContext } from "@inventreedb/ui";
 import type { CriticalPart } from "../types";
-import { exportToExcel, filterParts } from "../utils";
+import { exportToExcel, filterLowStockParts, filterParts } from "../utils";
 import { PartRow } from "./PartRow";
 import { TableHeader } from "./TableHeader";
 
@@ -13,17 +13,23 @@ interface AllPartsTableProps {
   parts: CriticalPart[];
   context: InvenTreePluginContext;
   searchTerm: string;
+  showLowStockOnly?: boolean;
 }
 
 export function AllPartsTable({
   parts,
   context,
   searchTerm,
+  showLowStockOnly = false,
 }: AllPartsTableProps) {
-  // Filter parts based on search
+  // Filter parts based on search and low stock filter
   const filteredParts = useMemo(() => {
-    return filterParts(parts, searchTerm);
-  }, [parts, searchTerm]);
+    let result = filterParts(parts, searchTerm);
+    if (showLowStockOnly) {
+      result = filterLowStockParts(result);
+    }
+    return result;
+  }, [parts, searchTerm, showLowStockOnly]);
 
   const handleExport = () => {
     exportToExcel(filteredParts);
@@ -35,7 +41,9 @@ export function AllPartsTable({
         <Text c="dimmed" ta="center">
           {searchTerm
             ? `No parts found matching "${searchTerm}"`
-            : "No critical parts available"}
+            : showLowStockOnly
+              ? "No low stock parts found"
+              : "No critical parts available"}
         </Text>
       </Paper>
     );
