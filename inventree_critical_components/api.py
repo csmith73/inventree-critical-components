@@ -99,20 +99,20 @@ def get_stock_locations_summary(part):
     return locations
 
 
-def get_stock_items_for_trackable(part):
-    """Get individual stock items for a trackable part.
+def get_stock_items_for_part(part):
+    """Get individual stock items for any part.
     
     Args:
-        part: Part instance (should be trackable)
+        part: Part instance
         
     Returns:
-        List of dicts with stock item details
+        List of dicts with stock item details including location, dates, and quantity
     """
     stock_items = StockItem.objects.filter(
         part=part
     ).filter(
         StockItem.IN_STOCK_FILTER
-    ).select_related('location').order_by('serial', 'pk')
+    ).select_related('location').order_by('location__pathstring', 'serial', 'pk')
     
     items = []
     for item in stock_items:
@@ -126,10 +126,19 @@ def get_stock_items_for_trackable(part):
             'location_path': item.location.pathstring if item.location else '',
             'status': str(item.status_label()),
             'updated': item.updated.isoformat() if item.updated else None,
+            'stocktake_date': item.stocktake_date.isoformat() if item.stocktake_date else None,
             'url': f'/stock/item/{item.pk}/',
         })
     
     return items
+
+
+def get_stock_items_for_trackable(part):
+    """Get individual stock items for a trackable part.
+    
+    Deprecated: Use get_stock_items_for_part instead.
+    """
+    return get_stock_items_for_part(part)
 
 
 def serialize_part(part, include_stock_items=True):
@@ -183,9 +192,9 @@ def serialize_part(part, include_stock_items=True):
         'stock_locations': get_stock_locations_summary(part),
     }
     
-    # Add individual stock items for trackable parts
-    if include_stock_items and part.trackable:
-        data['stock_items'] = get_stock_items_for_trackable(part)
+    # Add individual stock items for all parts (not just trackable)
+    if include_stock_items:
+        data['stock_items'] = get_stock_items_for_part(part)
     
     return data
 
@@ -494,16 +503,106 @@ def count_parts_in_locations(locations):
     return total, low_stock, unique_parts
 
 
+def serialize_part_flat(part):
+    """Serialize a part object for the flat 'all' view.
+    
+    Includes category information and stock items.
+    
+    Args:
+        part: Part instance
+        
+    Returns:
+        Dict with part data including category info
+    """
+    plugin = get_plugin()
+    show_low_stock = plugin.get_setting('SHOW_LOW_STOCK_WARNING', backup_value=True)
+    
+    # Get total stock
+    total_stock = part.total_stock
+    minimum_stock = float(part.minimum_stock) if part.minimum_stock else 0
+    
+    # Determine low stock status
+    is_low_stock = False
+    if show_low_stock and minimum_stock > 0:
+        is_low_stock = float(total_stock) < minimum_stock
+    
+    # Get image URLs
+    image_url = None
+    thumbnail_url = None
+    if part.image:
+        image_url = part.image.url
+        try:
+            if hasattr(part, 'get_thumbnail_url'):
+                thumbnail_url = part.get_thumbnail_url()
+            else:
+                thumbnail_url = image_url
+        except Exception:
+            thumbnail_url = image_url
+    
+    # Get category info
+    category_name = ''
+    category_path = ''
+    category_id = None
+    if part.category:
+        category_name = part.category.name
+        category_path = part.category.pathstring or part.category.name
+        category_id = part.category.pk
+    
+    data = {
+        'id': part.pk,
+        'name': part.name,
+        'IPN': part.IPN or '',
+        'description': part.description or '',
+        'image': image_url,
+        'thumbnail': thumbnail_url or image_url,
+        'total_stock': float(total_stock),
+        'minimum_stock': minimum_stock,
+        'is_low_stock': is_low_stock,
+        'trackable': part.trackable,
+        'url': f'/part/{part.pk}/',
+        'category_id': category_id,
+        'category_name': category_name,
+        'category_path': category_path,
+        'stock_items': get_stock_items_for_part(part),
+    }
+    
+    return data
+
+
+def build_flat_parts_list(parts):
+    """Build a flat list of all critical parts.
+    
+    Args:
+        parts: QuerySet or list of Part objects
+        
+    Returns:
+        List of serialized part dicts sorted by name
+    """
+    parts_list = []
+    added_parts = set()
+    
+    for part in parts:
+        if part.pk in added_parts:
+            continue
+        added_parts.add(part.pk)
+        parts_list.append(serialize_part_flat(part))
+    
+    # Sort by name
+    parts_list = sorted(parts_list, key=lambda p: p['name'].lower())
+    
+    return parts_list
+
+
 class CriticalComponentsListView(APIView):
-    """API endpoint to get all critical components organized by category or location."""
+    """API endpoint to get all critical components organized by category, location, or flat list."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Get all critical components organized by category or location hierarchy.
+        """Get all critical components organized by category, location, or as flat list.
         
         Query Parameters:
-            group_by: 'category' (default) or 'location'
+            group_by: 'category' (default), 'location', or 'all' (flat list)
         """
         # Check permission to view parts
         if not request.user.has_perm('part.view_part'):
@@ -518,7 +617,20 @@ class CriticalComponentsListView(APIView):
         # Check grouping preference
         group_by = request.query_params.get('group_by', 'category').lower()
         
-        if group_by == 'location':
+        if group_by == 'all':
+            # Build flat list of all parts
+            parts_list = build_flat_parts_list(parts)
+            
+            # Count low stock
+            low_stock_count = sum(1 for p in parts_list if p.get('is_low_stock', False))
+            
+            return Response({
+                'group_by': 'all',
+                'parts': parts_list,
+                'total_parts': len(parts_list),
+                'total_critical_low_stock': low_stock_count,
+            })
+        elif group_by == 'location':
             # Build location hierarchy
             locations = build_location_hierarchy(parts)
             
