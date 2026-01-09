@@ -27,7 +27,7 @@ class CriticalComponentsPlugin(
     SLUG = 'criticalcomponents'
     TITLE = 'Critical Components'
     DESCRIPTION = 'Track and display critical components organized by category'
-    VERSION = '1.0.0'
+    VERSION = '1.0.1'
     AUTHOR = 'InvenTree Critical Components Plugin'
     
     # Minimum InvenTree version required
