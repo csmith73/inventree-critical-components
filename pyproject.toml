@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inventree-critical-components"
-version = "1.0.2"
+version = "1.0.3"
 description = "Critical Components Plugin for InvenTree - Track and display critical components organized by category"
 readme = "README.md"
 license = {text = "MIT"}
