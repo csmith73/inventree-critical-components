@@ -3,19 +3,17 @@ import { defineConfig } from "vite";
 import { viteExternalsPlugin } from "vite-plugin-externals";
 
 // External libraries provided by InvenTree at runtime
+// Only include libraries that are officially exposed by InvenTree
+// Other libraries (@mantine/hooks, @tabler/icons-react, @tanstack/react-query, @inventreedb/ui)
+// will be bundled into the plugin
 const externalLibs = {
   react: "React",
   "react-dom": "ReactDOM",
   "react-dom/client": "ReactDOM",
   "@mantine/core": "MantineCore",
-  "@mantine/hooks": "MantineHooks",
   "@mantine/notifications": "MantineNotifications",
-  "@tabler/icons-react": "TablerIconsReact",
-  "@tanstack/react-query": "ReactQuery",
   "@lingui/core": "LinguiCore",
-  "@lingui/core/macro": "LinguiCoreMacro",
   "@lingui/react": "LinguiReact",
-  "@inventreedb/ui": "PluginUIFeature",
 };
 
 export default defineConfig({
