@@ -2,7 +2,6 @@
 
 from decimal import Decimal
 
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Sum
 
 from rest_framework import status
@@ -13,12 +12,23 @@ from rest_framework.views import APIView
 import structlog
 
 # Backward-compatible imports for Parameter and ParameterTemplate
-# In InvenTree >= 1.2.0, these models were moved to common.models
-# In InvenTree < 1.2.0 (e.g., 1.1.7), they are in part.models with different names
+# In InvenTree >= 1.2.0, these models were moved to common.models and use
+# a generic ContentType-based relationship (model_type/model_id fields)
+# In InvenTree < 1.2.0 (e.g., 1.1.7), they are in part.models with a direct
+# FK to Part (part/part_id fields)
+USES_GENERIC_PARAMETER_MODEL = False
 try:
     from common.models import Parameter, ParameterTemplate
+    # Check if this is the new generic model (has model_type field)
+    USES_GENERIC_PARAMETER_MODEL = hasattr(Parameter, 'model_type') and hasattr(Parameter._meta.get_field('model_type'), 'related_model')
 except ImportError:
     from part.models import PartParameter as Parameter, PartParameterTemplate as ParameterTemplate
+    USES_GENERIC_PARAMETER_MODEL = False
+
+# Only import ContentType if we're using the generic parameter model
+if USES_GENERIC_PARAMETER_MODEL:
+    from django.contrib.contenttypes.models import ContentType
+
 from part.models import Part, PartCategory
 from plugin import registry
 from stock.models import StockItem, StockLocation
@@ -36,6 +46,10 @@ def get_critical_parts():
     
     Returns:
         QuerySet of Part objects that are marked as critical
+    
+    Note:
+        This function supports both InvenTree < 1.2.0 (PartParameter model with direct
+        FK to Part) and InvenTree >= 1.2.0 (generic Parameter model with ContentType).
     """
     plugin = get_plugin()
     param_name = plugin.get_parameter_name()
@@ -48,18 +62,25 @@ def get_critical_parts():
         logger.warning(f'Parameter template "{param_name}" not found')
         return Part.objects.none()
     
-    # Get content type for Part model
-    part_content_type = ContentType.objects.get_for_model(Part)
-    
-    # Find all parameters with true values
-    parameters = Parameter.objects.filter(
-        template=template,
-        model_type=part_content_type,
-        data__in=true_values
-    )
-    
-    # Get part IDs
-    part_ids = parameters.values_list('model_id', flat=True)
+    # Query parameters based on the model structure
+    if USES_GENERIC_PARAMETER_MODEL:
+        # InvenTree >= 1.2.0: Generic Parameter model with ContentType
+        # Uses model_type (ContentType FK) and model_id fields
+        part_content_type = ContentType.objects.get_for_model(Part)
+        parameters = Parameter.objects.filter(
+            template=template,
+            model_type=part_content_type,
+            data__in=true_values
+        )
+        part_ids = parameters.values_list('model_id', flat=True)
+    else:
+        # InvenTree < 1.2.0: PartParameter model with direct FK to Part
+        # Uses part_id field directly
+        parameters = Parameter.objects.filter(
+            template=template,
+            data__in=true_values
+        )
+        part_ids = parameters.values_list('part_id', flat=True)
     
     # Fetch parts with prefetch for efficiency
     parts = Part.objects.filter(pk__in=part_ids).prefetch_related(
