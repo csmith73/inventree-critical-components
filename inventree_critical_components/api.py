@@ -899,7 +899,7 @@ def get_stock_tracking_for_item(stock_item_id):
         entries.append({
             'id': entry.pk,
             'date': entry.date.isoformat() if entry.date else None,
-            'label': entry.label or '',
+            'label': entry.label() or '',
             'notes': entry.notes or '',
             'user': entry.user.username if entry.user else None,
             'details': ' | '.join(details_parts) if details_parts else '',
