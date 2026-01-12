@@ -48,11 +48,10 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
       <Table striped highlightOnHover withTableBorder={false}>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Location</Table.Th>
             {hasSerial && <Table.Th>Serial</Table.Th>}
+            <Table.Th>Location</Table.Th>
             <Table.Th style={{ textAlign: "right" }}>Quantity</Table.Th>
-            <Table.Th>Last Updated</Table.Th>
-            <Table.Th>Stocktake Date</Table.Th>
+            <Table.Th>Last Stock Qty Edit Date</Table.Th>
             <Table.Th>Status</Table.Th>
             {hasNotes && <Table.Th>Notes</Table.Th>}
           </Table.Tr>
@@ -60,6 +59,20 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
         <Table.Tbody>
           {stockItems.map((item) => (
             <Table.Tr key={item.id}>
+              {hasSerial && (
+                <Table.Td>
+                  <Anchor
+                    size="sm"
+                    fw={500}
+                    onClick={() => {
+                      context.navigate(item.url);
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {item.serial || "-"}
+                  </Anchor>
+                </Table.Td>
+              )}
               <Table.Td>
                 <Anchor
                   size="sm"
@@ -73,21 +86,9 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                   {item.location_path || item.location}
                 </Anchor>
               </Table.Td>
-              {hasSerial && (
-                <Table.Td>
-                  <Text size="sm" fw={500}>
-                    {item.serial || "-"}
-                  </Text>
-                </Table.Td>
-              )}
               <Table.Td style={{ textAlign: "right" }}>
                 <Text size="sm" fw={500}>
                   {item.quantity}
-                </Text>
-              </Table.Td>
-              <Table.Td>
-                <Text size="sm" c="dimmed">
-                  {formatDate(item.updated)}
                 </Text>
               </Table.Td>
               <Table.Td>
