@@ -10,6 +10,8 @@ export {
   filterParts,
   filterLowStockParts,
   filterGroupsLowStockOnly,
+  filterNeedsCheckParts,
+  filterGroupsNeedsCheckOnly,
 } from "./stockUtils";
 
 export { exportToExcel, exportToExcelWithStockItems } from "./exportUtils";

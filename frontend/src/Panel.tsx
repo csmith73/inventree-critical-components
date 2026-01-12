@@ -24,6 +24,7 @@ import {
   IconCategory,
   IconChevronsDown,
   IconChevronsUp,
+  IconClock,
   IconList,
   IconMapPin,
   IconX,
@@ -33,7 +34,7 @@ import { checkPluginVersion, type InvenTreePluginContext } from "@inventreedb/ui
 
 import { LocalizedComponent } from "./locale";
 import type { CriticalComponentsData, GroupByType } from "./types";
-import { filterGroups, filterGroupsLowStockOnly, getAllGroupIds } from "./utils";
+import { filterGroups, filterGroupsLowStockOnly, filterGroupsNeedsCheckOnly, getAllGroupIds } from "./utils";
 import {
   AllPartsTable,
   GroupRenderer,
@@ -53,6 +54,7 @@ function CriticalComponentsPanel({
   const [debouncedSearch] = useDebouncedValue(searchValue, 300);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [showNeedsCheckOnly, setShowNeedsCheckOnly] = useState(false);
 
   // Fetch critical components data
   const { data, isLoading, isError, error } = useQuery<CriticalComponentsData>(
@@ -76,14 +78,17 @@ function CriticalComponentsPanel({
     return [];
   }, [data, groupBy]);
 
-  // Filter groups based on search and low stock filter
+  // Filter groups based on search, low stock filter, and needs check filter
   const filteredGroups = useMemo(() => {
     let result = filterGroups(groups, debouncedSearch);
     if (showLowStockOnly) {
       result = filterGroupsLowStockOnly(result);
     }
+    if (showNeedsCheckOnly) {
+      result = filterGroupsNeedsCheckOnly(result);
+    }
     return result;
-  }, [groups, debouncedSearch, showLowStockOnly]);
+  }, [groups, debouncedSearch, showLowStockOnly, showNeedsCheckOnly]);
 
   // All group IDs for expand/collapse all
   const allGroupIds = useMemo(() => {
@@ -214,6 +219,15 @@ function CriticalComponentsPanel({
               {data.total_out_of_stock} Out of Stock
             </Badge>
           )}
+          {(data.total_needs_check ?? 0) > 0 && (
+            <Badge
+              color="yellow"
+              size="lg"
+              leftSection={<IconClock size={12} />}
+            >
+              {data.total_needs_check} Needs Check
+            </Badge>
+          )}
         </Group>
       </Group>
 
@@ -294,6 +308,22 @@ function CriticalComponentsPanel({
                 }
               />
             </Tooltip>
+
+            {/* Needs Check Filter */}
+            <Tooltip label="Show only items needing stock check">
+              <Switch
+                checked={showNeedsCheckOnly}
+                onChange={(event) => setShowNeedsCheckOnly(event.currentTarget.checked)}
+                label="Needs Check Only"
+                size="xs"
+                color="yellow"
+                thumbIcon={
+                  showNeedsCheckOnly ? (
+                    <IconClock size={10} color="orange" />
+                  ) : null
+                }
+              />
+            </Tooltip>
           </Group>
         </Group>
       </Paper>
@@ -314,6 +344,7 @@ function CriticalComponentsPanel({
           context={context}
           searchTerm={debouncedSearch}
           showLowStockOnly={showLowStockOnly}
+          showNeedsCheckOnly={showNeedsCheckOnly}
         />
       ) : (
         /* Grouped View (category or location) */

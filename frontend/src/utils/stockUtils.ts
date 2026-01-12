@@ -206,3 +206,42 @@ export function filterGroupsLowStockOnly(groups: GroupNode[]): GroupNode[] {
     .map(filterGroup)
     .filter((group): group is GroupNode => group !== null);
 }
+
+/**
+ * Filter flat parts list to only show parts with stock items that need to be checked
+ */
+export function filterNeedsCheckParts(parts: CriticalPart[]): CriticalPart[] {
+  return parts.filter((part) => part.has_needs_check === true);
+}
+
+/**
+ * Filter groups to only show parts with stock items that need to be checked, removing empty groups
+ */
+export function filterGroupsNeedsCheckOnly(groups: GroupNode[]): GroupNode[] {
+  function filterGroup(group: GroupNode): GroupNode | null {
+    // Filter parts that have stock needing check
+    const needsCheckParts = group.parts.filter(
+      (part) => part.has_needs_check === true
+    );
+
+    // Recursively filter children
+    const filteredChildren = group.children
+      .map(filterGroup)
+      .filter((child): child is GroupNode => child !== null);
+
+    // Return group if it has parts needing check or filtered children
+    if (needsCheckParts.length > 0 || filteredChildren.length > 0) {
+      return {
+        ...group,
+        parts: needsCheckParts,
+        children: filteredChildren,
+      };
+    }
+
+    return null;
+  }
+
+  return groups
+    .map(filterGroup)
+    .filter((group): group is GroupNode => group !== null);
+}

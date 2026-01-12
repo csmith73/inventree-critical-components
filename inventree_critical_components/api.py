@@ -1,5 +1,6 @@
 """API views for the Critical Components plugin."""
 
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -92,6 +93,76 @@ def get_critical_parts():
     return parts
 
 
+def get_stock_qty_check_days_for_parts(part_ids):
+    """Get StockQtyCheckDays parameter values for specified parts.
+    
+    This function supports both InvenTree < 1.2.0 (PartParameter model with direct
+    FK to Part) and InvenTree >= 1.2.0 (generic Parameter model with ContentType).
+    
+    Args:
+        part_ids: Collection of part IDs to look up
+        
+    Returns:
+        Dict mapping part_id to StockQtyCheckDays value (int)
+    """
+    # Find the parameter template
+    try:
+        template = ParameterTemplate.objects.get(name__iexact='StockQtyCheckDays')
+    except ParameterTemplate.DoesNotExist:
+        return {}
+    
+    # Query parameters based on the model structure
+    if USES_GENERIC_PARAMETER_MODEL:
+        # InvenTree >= 1.2.0: Generic Parameter model with ContentType
+        part_content_type = ContentType.objects.get_for_model(Part)
+        parameters = Parameter.objects.filter(
+            template=template,
+            model_type=part_content_type,
+            model_id__in=part_ids
+        )
+        result = {}
+        for p in parameters:
+            try:
+                value = int(p.data)
+                if value > 0:
+                    result[p.model_id] = value
+            except (ValueError, TypeError):
+                pass
+        return result
+    else:
+        # InvenTree < 1.2.0: PartParameter model with direct FK to Part
+        parameters = Parameter.objects.filter(
+            template=template,
+            part_id__in=part_ids
+        )
+        result = {}
+        for p in parameters:
+            try:
+                value = int(p.data)
+                if value > 0:
+                    result[p.part_id] = value
+            except (ValueError, TypeError):
+                pass
+        return result
+
+
+def calculate_days_since_check(stocktake_date):
+    """Calculate the number of days since the last stock check.
+    
+    Args:
+        stocktake_date: Date of last stocktake (date object or None)
+        
+    Returns:
+        Number of days since check, or None if no stocktake date
+    """
+    if not stocktake_date:
+        return None
+    
+    today = date.today()
+    delta = today - stocktake_date
+    return delta.days
+
+
 def get_stock_locations_summary(part):
     """Get stock grouped by location for a part.
     
@@ -126,11 +197,12 @@ def get_stock_locations_summary(part):
     return locations
 
 
-def get_stock_items_for_part(part):
+def get_stock_items_for_part(part, stock_qty_check_days=None):
     """Get individual stock items for any part.
     
     Args:
         part: Part instance
+        stock_qty_check_days: Optional number of days for stock check frequency
         
     Returns:
         List of dicts with stock item details including location, dates, and quantity
@@ -143,6 +215,14 @@ def get_stock_items_for_part(part):
     
     items = []
     for item in stock_items:
+        # Calculate days since last stock check
+        days_since_check = calculate_days_since_check(item.stocktake_date)
+        
+        # Determine if stock needs to be checked
+        needs_check = False
+        if stock_qty_check_days is not None and days_since_check is not None:
+            needs_check = days_since_check > stock_qty_check_days
+        
         items.append({
             'id': item.pk,
             'serial': item.serial or '',
@@ -154,6 +234,8 @@ def get_stock_items_for_part(part):
             'status': str(item.status_label),
             'updated': item.updated.isoformat() if item.updated else None,
             'stocktake_date': item.stocktake_date.isoformat() if item.stocktake_date else None,
+            'days_since_check': days_since_check,
+            'needs_check': needs_check,
             'url': f'/stock/item/{item.pk}/',
             'notes': item.notes or '',
         })
@@ -169,12 +251,13 @@ def get_stock_items_for_trackable(part):
     return get_stock_items_for_part(part)
 
 
-def serialize_part(part, include_stock_items=True):
+def serialize_part(part, include_stock_items=True, stock_qty_check_days=None):
     """Serialize a part object for the API response.
     
     Args:
         part: Part instance
         include_stock_items: Whether to include individual stock items for trackable parts
+        stock_qty_check_days: Optional number of days for stock check frequency
         
     Returns:
         Dict with part data
@@ -218,11 +301,17 @@ def serialize_part(part, include_stock_items=True):
         'trackable': part.trackable,
         'url': f'/part/{part.pk}/',
         'stock_locations': get_stock_locations_summary(part),
+        'stock_qty_check_days': stock_qty_check_days,
     }
     
     # Add individual stock items for all parts (not just trackable)
     if include_stock_items:
-        data['stock_items'] = get_stock_items_for_part(part)
+        stock_items = get_stock_items_for_part(part, stock_qty_check_days)
+        data['stock_items'] = stock_items
+        # Check if any stock item needs checking
+        data['has_needs_check'] = any(item.get('needs_check', False) for item in stock_items)
+    else:
+        data['has_needs_check'] = False
     
     return data
 
@@ -243,10 +332,20 @@ def build_category_hierarchy(parts):
     # Track which parts have been added to avoid duplicates
     added_parts = set()
     
-    for part in parts:
+    # Convert to list to allow multiple iterations
+    parts_list = list(parts)
+    
+    # Fetch StockQtyCheckDays for all parts at once
+    part_ids = [part.pk for part in parts_list]
+    check_days_map = get_stock_qty_check_days_for_parts(part_ids)
+    
+    for part in parts_list:
         if part.pk in added_parts:
             continue
         added_parts.add(part.pk)
+        
+        # Get check days for this part
+        stock_qty_check_days = check_days_map.get(part.pk)
         
         if part.category:
             # Get the full ancestor chain for this category
@@ -275,7 +374,9 @@ def build_category_hierarchy(parts):
                 prev_children = category_map[cat_id]['children']
             
             # Add part to its direct category
-            category_map[part.category.pk]['parts'].append(serialize_part(part))
+            category_map[part.category.pk]['parts'].append(
+                serialize_part(part, stock_qty_check_days=stock_qty_check_days)
+            )
         else:
             # Part has no category - add to "Uncategorized"
             if 'uncategorized' not in category_map:
@@ -290,7 +391,9 @@ def build_category_hierarchy(parts):
                 category_map['uncategorized'] = uncategorized
                 root_categories.append(uncategorized)
             
-            category_map['uncategorized']['parts'].append(serialize_part(part))
+            category_map['uncategorized']['parts'].append(
+                serialize_part(part, stock_qty_check_days=stock_qty_check_days)
+            )
     
     # Sort categories and parts
     def sort_category(cat):
@@ -307,20 +410,21 @@ def build_category_hierarchy(parts):
 
 
 def count_parts_in_categories(categories):
-    """Count total parts, low stock parts, and out of stock parts in category hierarchy.
+    """Count total parts, low stock parts, out of stock parts, and needs check in category hierarchy.
     
     Args:
         categories: List of category dicts from build_category_hierarchy
         
     Returns:
-        Tuple of (total_parts, low_stock_count, out_of_stock_count)
+        Tuple of (total_parts, low_stock_count, out_of_stock_count, needs_check_count)
     """
     total = 0
     low_stock = 0
     out_of_stock = 0
+    needs_check = 0
     
     def count_recursive(cat_list):
-        nonlocal total, low_stock, out_of_stock
+        nonlocal total, low_stock, out_of_stock, needs_check
         for cat in cat_list:
             for part in cat['parts']:
                 total += 1
@@ -329,10 +433,12 @@ def count_parts_in_categories(categories):
                     out_of_stock += 1
                 elif part.get('is_low_stock', False):
                     low_stock += 1
+                if part.get('has_needs_check', False):
+                    needs_check += 1
             count_recursive(cat['children'])
     
     count_recursive(categories)
-    return total, low_stock, out_of_stock
+    return total, low_stock, out_of_stock, needs_check
 
 
 def serialize_part_for_location(part, location_id, quantity_at_location):
@@ -535,13 +641,14 @@ def count_parts_in_locations(locations):
     return total, low_stock, unique_parts
 
 
-def serialize_part_flat(part):
+def serialize_part_flat(part, stock_qty_check_days=None):
     """Serialize a part object for the flat 'all' view.
     
     Includes category information and stock items.
     
     Args:
         part: Part instance
+        stock_qty_check_days: Optional number of days for stock check frequency
         
     Returns:
         Dict with part data including category info
@@ -580,6 +687,10 @@ def serialize_part_flat(part):
         category_path = part.category.pathstring or part.category.name
         category_id = part.category.pk
     
+    # Get stock items with check status
+    stock_items = get_stock_items_for_part(part, stock_qty_check_days)
+    has_needs_check = any(item.get('needs_check', False) for item in stock_items)
+    
     data = {
         'id': part.pk,
         'name': part.name,
@@ -595,7 +706,9 @@ def serialize_part_flat(part):
         'category_id': category_id,
         'category_name': category_name,
         'category_path': category_path,
-        'stock_items': get_stock_items_for_part(part),
+        'stock_items': stock_items,
+        'stock_qty_check_days': stock_qty_check_days,
+        'has_needs_check': has_needs_check,
     }
     
     return data
@@ -610,14 +723,22 @@ def build_flat_parts_list(parts):
     Returns:
         List of serialized part dicts sorted by name
     """
+    # Convert to list to allow multiple iterations
+    parts_list_raw = list(parts)
+    
+    # Fetch StockQtyCheckDays for all parts at once
+    part_ids = [part.pk for part in parts_list_raw]
+    check_days_map = get_stock_qty_check_days_for_parts(part_ids)
+    
     parts_list = []
     added_parts = set()
     
-    for part in parts:
+    for part in parts_list_raw:
         if part.pk in added_parts:
             continue
         added_parts.add(part.pk)
-        parts_list.append(serialize_part_flat(part))
+        stock_qty_check_days = check_days_map.get(part.pk)
+        parts_list.append(serialize_part_flat(part, stock_qty_check_days=stock_qty_check_days))
     
     # Sort by name
     parts_list = sorted(parts_list, key=lambda p: p['name'].lower())
@@ -653,15 +774,18 @@ class CriticalComponentsListView(APIView):
             # Build flat list of all parts
             parts_list = build_flat_parts_list(parts)
             
-            # Count low stock and out of stock
+            # Count low stock, out of stock, and needs check
             low_stock_count = 0
             out_of_stock_count = 0
+            needs_check_count = 0
             for p in parts_list:
                 stock = p.get('total_stock', 0)
                 if stock <= 0:
                     out_of_stock_count += 1
                 elif p.get('is_low_stock', False):
                     low_stock_count += 1
+                if p.get('has_needs_check', False):
+                    needs_check_count += 1
             
             return Response({
                 'group_by': 'all',
@@ -669,6 +793,7 @@ class CriticalComponentsListView(APIView):
                 'total_parts': len(parts_list),
                 'total_critical_low_stock': low_stock_count,
                 'total_out_of_stock': out_of_stock_count,
+                'total_needs_check': needs_check_count,
             })
         elif group_by == 'location':
             # Build location hierarchy
@@ -689,7 +814,7 @@ class CriticalComponentsListView(APIView):
             categories = build_category_hierarchy(parts)
             
             # Count totals
-            total_parts, low_stock_count, out_of_stock_count = count_parts_in_categories(categories)
+            total_parts, low_stock_count, out_of_stock_count, needs_check_count = count_parts_in_categories(categories)
             
             return Response({
                 'group_by': 'category',
@@ -697,6 +822,7 @@ class CriticalComponentsListView(APIView):
                 'total_parts': total_parts,
                 'total_critical_low_stock': low_stock_count,
                 'total_out_of_stock': out_of_stock_count,
+                'total_needs_check': needs_check_count,
             })
 
 

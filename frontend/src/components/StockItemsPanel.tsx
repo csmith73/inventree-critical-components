@@ -1,8 +1,8 @@
 // Stock Items Panel Component - displays expanded stock item details
 
 import React, { useMemo, useState, useCallback } from "react";
-import { ActionIcon, Anchor, Box, Table, Text } from "@mantine/core";
-import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { ActionIcon, Anchor, Badge, Box, Table, Text } from "@mantine/core";
+import { IconChevronDown, IconChevronRight, IconClock } from "@tabler/icons-react";
 import type { InvenTreePluginContext } from "@inventreedb/ui";
 import type { StockItem, StockTrackingEntry } from "../types";
 import { formatDate } from "../utils";
@@ -37,7 +37,7 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
 
   // Calculate column count for colspan
   const columnCount = useMemo(() => {
-    let count = 5; // expand, location, quantity, date, status
+    let count = 6; // expand, location, quantity, check date, days since check, status
     if (hasSerial) count += 1;
     if (hasNotes) count += 1;
     return count;
@@ -100,7 +100,8 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
             {hasSerial && <Table.Th>Serial</Table.Th>}
             <Table.Th>Location</Table.Th>
             <Table.Th style={{ textAlign: "right" }}>Quantity</Table.Th>
-            <Table.Th>Last Stock Qty Edit Date</Table.Th>
+            <Table.Th>Last Stock Qty Check Date</Table.Th>
+            <Table.Th>Days Since Last Check</Table.Th>
             <Table.Th>Status</Table.Th>
             {hasNotes && <Table.Th>Notes</Table.Th>}
           </Table.Tr>
@@ -159,6 +160,21 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                   <Text size="sm" c="dimmed">
                     {formatDate(item.stocktake_date)}
                   </Text>
+                </Table.Td>
+                <Table.Td>
+                  {item.days_since_check !== null ? (
+                    <Badge
+                      color={item.needs_check ? "orange" : "green"}
+                      variant="light"
+                      size="sm"
+                      leftSection={item.needs_check ? <IconClock size={10} /> : null}
+                    >
+                      {item.days_since_check} days
+                      {item.needs_check ? " - Needs Check" : ""}
+                    </Badge>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">

@@ -12,6 +12,8 @@ export interface StockItem {
   status: string;
   updated: string | null;
   stocktake_date: string | null;
+  days_since_check: number | null;
+  needs_check: boolean;
   url: string;
   notes?: string;
 }
@@ -40,6 +42,9 @@ export interface CriticalPart {
   trackable: boolean;
   stock_items?: StockItem[];
   stock_locations?: StockLocationSummary[];
+  // Stock check parameters
+  stock_qty_check_days?: number | null;
+  has_needs_check?: boolean;
   // For "all" view
   category_id?: number | null;
   category_name?: string;
@@ -66,6 +71,7 @@ export interface CriticalComponentsData {
   total_entries?: number;
   total_critical_low_stock: number;
   total_out_of_stock?: number;
+  total_needs_check?: number;
 }
 
 // Group by type
