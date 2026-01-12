@@ -31,7 +31,7 @@ if USES_GENERIC_PARAMETER_MODEL:
 
 from part.models import Part, PartCategory
 from plugin import registry
-from stock.models import StockItem, StockLocation
+from stock.models import StockItem, StockItemTracking, StockLocation
 
 logger = structlog.get_logger('inventree')
 
@@ -734,4 +734,83 @@ class CriticalComponentsStatsView(APIView):
         return Response({
             'total_parts': total_parts,
             'total_critical_low_stock': low_stock_count,
+        })
+
+
+def get_stock_tracking_for_item(stock_item_id):
+    """Get stock tracking history for a specific stock item.
+    
+    Args:
+        stock_item_id: The ID of the stock item
+        
+    Returns:
+        List of dicts with tracking entry details
+    """
+    tracking_entries = StockItemTracking.objects.filter(
+        item_id=stock_item_id
+    ).select_related('user').order_by('-date')[:50]  # Limit to 50 most recent
+    
+    entries = []
+    for entry in tracking_entries:
+        # Extract details from deltas
+        deltas = entry.deltas or {}
+        
+        # Build details string from deltas
+        details_parts = []
+        if 'quantity' in deltas:
+            details_parts.append(f"Qty: {deltas['quantity']}")
+        if 'added' in deltas:
+            details_parts.append(f"Added: {deltas['added']}")
+        if 'removed' in deltas:
+            details_parts.append(f"Removed: {deltas['removed']}")
+        if 'location_detail' in deltas:
+            loc_detail = deltas['location_detail']
+            loc_name = loc_detail.get('name', '') if isinstance(loc_detail, dict) else str(loc_detail)
+            if loc_name:
+                details_parts.append(f"Location: {loc_name}")
+        
+        entries.append({
+            'id': entry.pk,
+            'date': entry.date.isoformat() if entry.date else None,
+            'label': entry.label or '',
+            'notes': entry.notes or '',
+            'user': entry.user.username if entry.user else None,
+            'details': ' | '.join(details_parts) if details_parts else '',
+        })
+    
+    return entries
+
+
+class StockTrackingView(APIView):
+    """API endpoint to get stock tracking history for a stock item."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, stock_id):
+        """Get tracking history for a specific stock item.
+        
+        Args:
+            stock_id: The ID of the stock item
+        """
+        # Check permission to view stock
+        if not request.user.has_perm('stock.view_stockitem'):
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        # Verify the stock item exists
+        try:
+            StockItem.objects.get(pk=stock_id)
+        except StockItem.DoesNotExist:
+            return Response(
+                {'error': 'Stock item not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        entries = get_stock_tracking_for_item(stock_id)
+        
+        return Response({
+            'stock_id': stock_id,
+            'entries': entries,
         })

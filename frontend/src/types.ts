@@ -78,3 +78,13 @@ export interface StockStatusInfo {
   progressColor: string;
   progressValue: number;
 }
+
+// Stock tracking entry for history
+export interface StockTrackingEntry {
+  id: number;
+  date: string | null;
+  label: string;        // Action like "Stock counted", "Stock moved", etc.
+  notes: string;
+  user: string | null;
+  details: string;      // Pre-formatted details string
+}

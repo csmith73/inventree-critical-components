@@ -67,6 +67,11 @@ class CriticalComponentsPlugin(
                 api.CriticalComponentsStatsView.as_view(),
                 name='critical-components-stats',
             ),
+            path(
+                'stock-tracking/<int:stock_id>/',
+                api.StockTrackingView.as_view(),
+                name='stock-tracking',
+            ),
         ]
 
     def get_ui_panels(self, request, context, **kwargs):

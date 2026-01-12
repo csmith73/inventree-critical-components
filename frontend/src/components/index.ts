@@ -6,4 +6,5 @@ export { GroupRenderer } from "./GroupRenderer";
 export { PartRow } from "./PartRow";
 export { SearchInput } from "./SearchInput";
 export { StockItemsPanel } from "./StockItemsPanel";
+export { StockTrackingPanel } from "./StockTrackingPanel";
 export { TableHeader } from "./TableHeader";
