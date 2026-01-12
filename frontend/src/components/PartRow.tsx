@@ -54,8 +54,31 @@ export function PartRow({
 
   // Determine grid columns based on view mode
   const gridColumns = showCategory
-    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px minmax(140px, 1fr)"
-    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px minmax(140px, 1fr)";
+    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)"
+    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)";
+
+  // Determine inventory status - check if any stock items need checking
+  const getInvStatus = () => {
+    // If no stock items, show not configured
+    if (!part.stock_items || part.stock_items.length === 0) {
+      return { label: "No Stock", color: "gray" };
+    }
+    // Check if any stock items have check_days_configured = false
+    const anyNotConfigured = part.stock_items.some(item => !item.check_days_configured);
+    if (anyNotConfigured && !part.has_needs_check) {
+      // All items either not configured or within range
+      const allNotConfigured = part.stock_items.every(item => !item.check_days_configured);
+      if (allNotConfigured) {
+        return { label: "Not Configured", color: "gray" };
+      }
+    }
+    // has_needs_check comes from API - true if any stock item needs check
+    if (part.has_needs_check) {
+      return { label: "Needs Check", color: "orange" };
+    }
+    return { label: "Inv Up to Date", color: "green" };
+  };
+  const invStatus = getInvStatus();
 
   return (
     <>
@@ -128,7 +151,7 @@ export function PartRow({
           {part.description || "-"}
         </Text>
 
-        {/* Status Badge */}
+        {/* Qty Status Badge */}
         <Badge
           color={status.color}
           size="sm"
@@ -140,6 +163,15 @@ export function PartRow({
           }
         >
           {status.label}
+        </Badge>
+
+        {/* Inv Status Badge */}
+        <Badge
+          color={invStatus.color}
+          size="sm"
+          variant="light"
+        >
+          {invStatus.label}
         </Badge>
 
         {/* Stock Level with Progress Bar */}

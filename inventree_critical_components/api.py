@@ -236,6 +236,7 @@ def get_stock_items_for_part(part, stock_qty_check_days=None):
             'stocktake_date': item.stocktake_date.isoformat() if item.stocktake_date else None,
             'days_since_check': days_since_check,
             'needs_check': needs_check,
+            'check_days_configured': stock_qty_check_days is not None,
             'url': f'/stock/item/{item.pk}/',
             'notes': item.notes or '',
         })

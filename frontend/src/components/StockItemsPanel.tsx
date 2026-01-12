@@ -60,7 +60,7 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
       if (!trackingData[stockId]) {
         setLoadingTracking(prev => new Set(prev).add(stockId));
         try {
-          const response = await context.api.get(`/api/plugins/criticalcomponents/stock-tracking/${stockId}/`);
+          const response = await context.api.get(`/plugin/criticalcomponents/stock-tracking/${stockId}/`);
           setTrackingData(prev => ({ ...prev, [stockId]: response.data.entries || [] }));
         } catch (error) {
           console.error('Failed to fetch stock tracking:', error);
@@ -164,13 +164,13 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                 <Table.Td>
                   {item.days_since_check !== null ? (
                     <Badge
-                      color={item.needs_check ? "orange" : "green"}
+                      color={!item.check_days_configured ? "gray" : item.needs_check ? "orange" : "green"}
                       variant="light"
                       size="sm"
                       leftSection={item.needs_check ? <IconClock size={10} /> : null}
                     >
                       {item.days_since_check} days
-                      {item.needs_check ? " - Needs Check" : ""}
+                      {!item.check_days_configured ? " - Not Configured" : item.needs_check ? " - Needs Check" : ""}
                     </Badge>
                   ) : (
                     <Text size="sm" c="dimmed">-</Text>

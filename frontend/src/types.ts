@@ -14,6 +14,7 @@ export interface StockItem {
   stocktake_date: string | null;
   days_since_check: number | null;
   needs_check: boolean;
+  check_days_configured: boolean;
   url: string;
   notes?: string;
 }
