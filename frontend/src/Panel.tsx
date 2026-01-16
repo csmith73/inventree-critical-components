@@ -49,7 +49,7 @@ function CriticalComponentsPanel({
   context: InvenTreePluginContext;
 }) {
   // State
-  const [groupBy, setGroupBy] = useState<GroupByType>("category");
+  const [groupBy, setGroupBy] = useState<GroupByType>("all");
   const [searchValue, setSearchValue] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchValue, 300);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -125,7 +125,7 @@ function CriticalComponentsPanel({
     setExpandedGroups(new Set());
   }, []);
 
-  // Auto-expand first level on initial load
+  // Auto-expand all levels on initial load
   useEffect(() => {
     if (
       filteredGroups.length > 0 &&
@@ -133,10 +133,8 @@ function CriticalComponentsPanel({
       groupBy !== "all"
     ) {
       const prefix = groupBy === "location" ? "loc" : "cat";
-      const firstLevelIds = filteredGroups.map(
-        (g) => `${prefix}-${g.id ?? "none"}-0`
-      );
-      setExpandedGroups(new Set(firstLevelIds));
+      const allIds = getAllGroupIds(filteredGroups, prefix);
+      setExpandedGroups(new Set(allIds));
     }
   }, [filteredGroups.length, groupBy]);
 
@@ -247,6 +245,15 @@ function CriticalComponentsPanel({
                 {
                   label: (
                     <Group gap={4}>
+                      <IconList size={14} />
+                      <span>All</span>
+                    </Group>
+                  ),
+                  value: "all",
+                },
+                {
+                  label: (
+                    <Group gap={4}>
                       <IconCategory size={14} />
                       <span>Category</span>
                     </Group>
@@ -261,15 +268,6 @@ function CriticalComponentsPanel({
                     </Group>
                   ),
                   value: "location",
-                },
-                {
-                  label: (
-                    <Group gap={4}>
-                      <IconList size={14} />
-                      <span>All</span>
-                    </Group>
-                  ),
-                  value: "all",
                 },
               ]}
               size="xs"
