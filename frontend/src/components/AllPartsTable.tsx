@@ -1,11 +1,10 @@
 // All Parts Table Component - flat table view without grouping
 
 import React, { useMemo } from "react";
-import { ActionIcon, Box, Group, Paper, Text, Tooltip } from "@mantine/core";
-import { IconFileSpreadsheet } from "@tabler/icons-react";
+import { Box, Paper, Text } from "@mantine/core";
 import type { InvenTreePluginContext } from "@inventreedb/ui";
 import type { CriticalPart } from "../types";
-import { exportToExcel, filterLowStockParts, filterNeedsCheckParts, filterParts } from "../utils";
+import { filterLowStockParts, filterNeedsCheckParts, filterParts } from "../utils";
 import { PartRow } from "./PartRow";
 import { TableHeader } from "./TableHeader";
 
@@ -36,10 +35,6 @@ export function AllPartsTable({
     return result;
   }, [parts, searchTerm, showLowStockOnly, showNeedsCheckOnly]);
 
-  const handleExport = () => {
-    exportToExcel(filteredParts);
-  };
-
   if (filteredParts.length === 0) {
     return (
       <Paper withBorder p="xl">
@@ -58,20 +53,6 @@ export function AllPartsTable({
 
   return (
     <Box>
-      {/* Export button row */}
-      <Group justify="flex-end" mb="sm">
-        <Tooltip label="Export to Excel">
-          <ActionIcon
-            variant="light"
-            color="green"
-            size="lg"
-            onClick={handleExport}
-          >
-            <IconFileSpreadsheet size={20} />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
-
       {/* Table */}
       <Paper withBorder style={{ overflow: "hidden" }}>
         <TableHeader showCategory={true} />

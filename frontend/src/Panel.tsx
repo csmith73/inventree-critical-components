@@ -25,6 +25,7 @@ import {
   IconChevronsDown,
   IconChevronsUp,
   IconClock,
+  IconFileSpreadsheet,
   IconList,
   IconMapPin,
   IconX,
@@ -34,7 +35,7 @@ import { checkPluginVersion, type InvenTreePluginContext } from "@inventreedb/ui
 
 import { LocalizedComponent } from "./locale";
 import type { CriticalComponentsData, GroupByType } from "./types";
-import { filterGroups, filterGroupsLowStockOnly, filterGroupsNeedsCheckOnly, getAllGroupIds } from "./utils";
+import { exportToExcel, filterGroups, filterGroupsLowStockOnly, filterGroupsNeedsCheckOnly, filterLowStockParts, filterNeedsCheckParts, filterParts, getAllGroupIds } from "./utils";
 import {
   AllPartsTable,
   GroupRenderer,
@@ -223,7 +224,7 @@ function CriticalComponentsPanel({
               size="lg"
               leftSection={<IconClock size={12} />}
             >
-              {data.total_needs_check} Needs Check
+              {data.total_needs_check} Needs Stock Count
             </Badge>
           )}
         </Group>
@@ -321,6 +322,27 @@ function CriticalComponentsPanel({
                   ) : null
                 }
               />
+            </Tooltip>
+
+            {/* Export to Excel */}
+            <Divider orientation="vertical" />
+            <Tooltip label="Export to Excel">
+              <ActionIcon
+                variant="light"
+                color="green"
+                onClick={() => {
+                  let partsToExport = filterParts(data.parts ?? [], debouncedSearch);
+                  if (showLowStockOnly) {
+                    partsToExport = filterLowStockParts(partsToExport);
+                  }
+                  if (showNeedsCheckOnly) {
+                    partsToExport = filterNeedsCheckParts(partsToExport);
+                  }
+                  exportToExcel(partsToExport);
+                }}
+              >
+                <IconFileSpreadsheet size={16} />
+              </ActionIcon>
             </Tooltip>
           </Group>
         </Group>
