@@ -209,8 +209,6 @@ def get_stock_items_for_part(part, stock_qty_check_days=None):
     """
     stock_items = StockItem.objects.filter(
         part=part
-    ).filter(
-        StockItem.IN_STOCK_FILTER
     ).select_related('location').order_by('location__pathstring', 'serial', 'pk')
     
     items = []
