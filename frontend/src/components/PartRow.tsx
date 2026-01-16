@@ -122,22 +122,31 @@ export function PartRow({
             {part.name.charAt(0)}
           </Avatar>
           <Box style={{ minWidth: 0, flex: 1 }}>
-            <Anchor
-              size="sm"
-              fw={500}
-              onClick={goToPart}
-              style={{ cursor: "pointer" }}
-              truncate
-            >
-              {part.name}
-            </Anchor>
+            <Group gap="xs" wrap="nowrap">
+              <Anchor
+                size="sm"
+                fw={500}
+                onClick={goToPart}
+                style={{ cursor: "pointer" }}
+                truncate
+              >
+                {part.name}
+              </Anchor>
+              {part.trackable && (
+                <Badge size="xs" variant="light" color="blue">
+                  Trackable
+                </Badge>
+              )}
+            </Group>
           </Box>
         </Group>
 
         {/* IPN - now a separate prominent column */}
-        <Text size="sm" c={part.IPN ? "dark" : "dimmed"} truncate fw={part.IPN ? 500 : 400}>
-          {part.IPN || "-"}
-        </Text>
+        <Tooltip label={part.IPN} disabled={!part.IPN}>
+          <Text size="sm" c={part.IPN ? "dark" : "dimmed"} truncate fw={part.IPN ? 500 : 400}>
+            {part.IPN || "-"}
+          </Text>
+        </Tooltip>
 
         {/* Category (only in "all" view) */}
         {showCategory && (
@@ -147,9 +156,11 @@ export function PartRow({
         )}
 
         {/* Description */}
-        <Text size="sm" c="dimmed" lineClamp={1}>
-          {part.description || "-"}
-        </Text>
+        <Tooltip label={part.description} disabled={!part.description}>
+          <Text size="sm" c="dimmed" lineClamp={1}>
+            {part.description || "-"}
+          </Text>
+        </Tooltip>
 
         {/* Qty Status Badge */}
         <Badge

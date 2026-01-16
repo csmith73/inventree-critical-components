@@ -37,11 +37,10 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
 
   // Calculate column count for colspan
   const columnCount = useMemo(() => {
-    let count = 6; // expand, location, quantity, check date, days since check, status
-    if (hasSerial) count += 1;
+    let count = 7; // expand, serial/stockitem, location, quantity, check date, days since check, status
     if (hasNotes) count += 1;
     return count;
-  }, [hasSerial, hasNotes]);
+  }, [hasNotes]);
 
   // Toggle expand/collapse for a stock item
   const toggleExpand = useCallback(async (stockId: number) => {
@@ -98,10 +97,11 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
           <Table.Tr>
             <Table.Th style={{ width: 40 }} />
             {hasSerial && <Table.Th>Serial</Table.Th>}
+            {!hasSerial && <Table.Th>Stock Item</Table.Th>}
             <Table.Th>Location</Table.Th>
             <Table.Th style={{ textAlign: "right" }}>Quantity</Table.Th>
-            <Table.Th>Last Stock Qty Check Date</Table.Th>
-            <Table.Th>Days Since Last Check</Table.Th>
+            <Table.Th>Last Stock Count Date</Table.Th>
+            <Table.Th>Days Since Last Stock Count</Table.Th>
             <Table.Th>Status</Table.Th>
             {hasNotes && <Table.Th>Notes</Table.Th>}
           </Table.Tr>
@@ -135,6 +135,20 @@ export function StockItemsPanel({ stockItems, context }: StockItemsPanelProps) {
                       style={{ cursor: "pointer" }}
                     >
                       {item.serial || "-"}
+                    </Anchor>
+                  </Table.Td>
+                )}
+                {!hasSerial && (
+                  <Table.Td>
+                    <Anchor
+                      size="sm"
+                      fw={500}
+                      onClick={() => {
+                        context.navigate(item.url);
+                      }}
+                      style={{ cursor: "pointer" }}
+                    >
+                      #{item.id}
                     </Anchor>
                   </Table.Td>
                 )}

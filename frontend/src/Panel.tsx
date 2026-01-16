@@ -312,7 +312,7 @@ function CriticalComponentsPanel({
               <Switch
                 checked={showNeedsCheckOnly}
                 onChange={(event) => setShowNeedsCheckOnly(event.currentTarget.checked)}
-                label="Needs Check Only"
+                label="Needs Stock Count Only"
                 size="xs"
                 color="yellow"
                 thumbIcon={
