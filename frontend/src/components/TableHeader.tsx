@@ -14,8 +14,8 @@ export function TableHeader({
 }: TableHeaderProps) {
   // Determine grid columns based on view mode
   const gridColumns = showCategory
-    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)"
-    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)";
+    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px 110px 120px minmax(140px, 1fr)"
+    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px 110px 120px minmax(140px, 1fr)";
 
   return (
     <Box
@@ -57,6 +57,15 @@ export function TableHeader({
       <Text size="xs" fw={600} c="dimmed" tt="uppercase">
         Inv Status
       </Text>
+
+      <Tooltip
+        label="Lead time in days (most recent received purchase order)"
+        position="left"
+      >
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+          Lead Time
+        </Text>
+      </Tooltip>
 
       <Tooltip
         label="Current stock quantity / Minimum stock level"

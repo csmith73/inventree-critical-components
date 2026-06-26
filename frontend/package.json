@@ -7,14 +7,14 @@
     "build": "vite build --emptyOutDir"
   },
   "dependencies": {
-    "@inventreedb/ui": "^0.7.0",
-    "@lingui/core": "^5.2.1",
-    "@lingui/react": "^5.2.1",
-    "@mantine/core": "^7.17.4",
-    "@mantine/hooks": "^7.17.4",
-    "@mantine/notifications": "^7.17.4",
-    "@tabler/icons-react": "^3.30.0",
-    "@tanstack/react-query": "^5",
+    "@inventreedb/ui": "^1.4.5",
+    "@lingui/core": "^5.9.2",
+    "@lingui/react": "^5.9.2",
+    "@mantine/core": "^9.2.1",
+    "@mantine/hooks": "^9.2.1",
+    "@mantine/notifications": "^9.2.1",
+    "@tabler/icons-react": "^3.44.0",
+    "@tanstack/react-query": "^5.101.0",
     "react": "^19",
     "react-dom": "^19",
     "xlsx": "^0.18.5"

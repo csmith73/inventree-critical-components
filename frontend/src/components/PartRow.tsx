@@ -7,13 +7,25 @@ import {
   Avatar,
   Badge,
   Box,
+  Button,
   Collapse,
   Group,
+  NumberInput,
+  Popover,
   Progress,
+  Stack,
+  Switch,
   Text,
   Tooltip,
 } from "@mantine/core";
-import { IconAlertTriangle, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
+import {
+  IconAlertTriangle,
+  IconChevronDown,
+  IconChevronRight,
+  IconLock,
+  IconPencil,
+} from "@tabler/icons-react";
 import type { InvenTreePluginContext } from "@inventreedb/ui";
 import type { CriticalPart } from "../types";
 import { formatStockDisplay, getStockStatus } from "../utils";
@@ -52,10 +64,58 @@ export function PartRow({
     }
   }, [canExpand]);
 
+  // Lead time manual-edit popover state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editValue, setEditValue] = useState<number | string>(part.lead_time ?? "");
+  const [editManual, setEditManual] = useState<boolean>(part.lead_time_manual ?? false);
+  const [saving, setSaving] = useState(false);
+
+  const openEditor = useCallback(() => {
+    // Reset the form to the part's current values whenever the popover opens
+    setEditValue(part.lead_time ?? "");
+    setEditManual(part.lead_time_manual ?? false);
+    setEditOpen(true);
+  }, [part.lead_time, part.lead_time_manual]);
+
+  const saveLeadTime = useCallback(async () => {
+    setSaving(true);
+    try {
+      const leadTimeValue =
+        editValue === "" || editValue === null ? null : Number(editValue);
+      await context.api.post(
+        "/plugin/criticalcomponents/set-lead-time/",
+        {
+          part_id: part.id,
+          lead_time: leadTimeValue,
+          manual: editManual,
+        }
+      );
+      notifications.show({
+        title: "Lead time updated",
+        message: `${part.name}: ${
+          leadTimeValue != null ? `${leadTimeValue}d` : "cleared"
+        }${editManual ? " (manual)" : ""}`,
+        color: "green",
+      });
+      setEditOpen(false);
+      await context.queryClient.invalidateQueries({
+        queryKey: ["critical-components"],
+      });
+    } catch (err) {
+      notifications.show({
+        title: "Failed to update lead time",
+        message: err instanceof Error ? err.message : "Unknown error",
+        color: "red",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [context, part.id, part.name, editValue, editManual]);
+
   // Determine grid columns based on view mode
   const gridColumns = showCategory
-    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)"
-    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px 110px minmax(140px, 1fr)";
+    ? "30px minmax(150px, 1.5fr) 100px minmax(120px, 1fr) minmax(100px, 1fr) 100px 110px 120px minmax(140px, 1fr)"
+    : "30px minmax(180px, 2fr) 100px minmax(100px, 1fr) 100px 110px 120px minmax(140px, 1fr)";
 
   // Determine inventory status - check if any stock items need checking
   const getInvStatus = () => {
@@ -185,6 +245,78 @@ export function PartRow({
           {invStatus.label}
         </Badge>
 
+        {/* Lead Time (with manual-edit popover) */}
+        <Group gap={4} wrap="nowrap">
+          <Text size="sm">
+            {part.lead_time != null ? `${part.lead_time}d` : "-"}
+          </Text>
+          {part.lead_time_manual && (
+            <Tooltip label="Manual override (protected from recalculation)">
+              <IconLock size={12} color="var(--mantine-color-blue-6)" />
+            </Tooltip>
+          )}
+          <Popover
+            opened={editOpen}
+            onChange={setEditOpen}
+            position="bottom"
+            withArrow
+            shadow="md"
+            trapFocus
+          >
+            <Popover.Target>
+              <Tooltip label="Edit lead time">
+                <ActionIcon
+                  variant="subtle"
+                  size="xs"
+                  color="gray"
+                  onClick={openEditor}
+                >
+                  <IconPencil size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs" style={{ minWidth: 220 }}>
+                <Text size="sm" fw={600}>
+                  Lead time — {part.name}
+                </Text>
+                <NumberInput
+                  label="Lead time (days)"
+                  value={editValue}
+                  min={0}
+                  allowDecimal={false}
+                  placeholder="—"
+                  onChange={(value) => {
+                    setEditValue(value);
+                    // Auto-enable manual override when the value is edited
+                    setEditManual(true);
+                  }}
+                />
+                <Switch
+                  label="Manual override (protect from recalc)"
+                  checked={editManual}
+                  onChange={(event) =>
+                    setEditManual(event.currentTarget.checked)
+                  }
+                />
+                <Group justify="flex-end" gap="xs">
+                  <Button
+                    variant="default"
+                    size="xs"
+                    onClick={() => setEditOpen(false)}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="xs" onClick={saveLeadTime} loading={saving}>
+                    Save
+                  </Button>
+                </Group>
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        </Group>
+
         {/* Stock Level with Progress Bar */}
         <Tooltip
           label={
@@ -221,7 +353,7 @@ export function PartRow({
 
       {/* Expanded Stock Items */}
       {canExpand && (
-        <Collapse in={isExpanded}>
+        <Collapse expanded={isExpanded}>
           <StockItemsPanel stockItems={part.stock_items || []} context={context} />
         </Collapse>
       )}

@@ -28,9 +28,11 @@ import {
   IconFileSpreadsheet,
   IconList,
   IconMapPin,
+  IconRefresh,
   IconX,
   IconBoxOff,
 } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
 import { checkPluginVersion, type InvenTreePluginContext } from "@inventreedb/ui";
 
 import { LocalizedComponent } from "./locale";
@@ -56,6 +58,7 @@ function CriticalComponentsPanel({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showNeedsCheckOnly, setShowNeedsCheckOnly] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Fetch critical components data
   const { data, isLoading, isError, error } = useQuery<CriticalComponentsData>(
@@ -322,6 +325,44 @@ function CriticalComponentsPanel({
                   ) : null
                 }
               />
+            </Tooltip>
+
+            {/* Recalculate Lead Times */}
+            <Divider orientation="vertical" />
+            <Tooltip label="Recalculate lead times for all critical parts">
+              <ActionIcon
+                variant="light"
+                color="blue"
+                loading={isRecalculating}
+                onClick={async () => {
+                  setIsRecalculating(true);
+                  try {
+                    const response = await context.api.post(
+                      "/plugin/criticalcomponents/recalculate-lead-times/"
+                    );
+                    const { updated = 0, skipped = 0 } = response.data ?? {};
+                    notifications.show({
+                      title: "Lead times updated",
+                      message: `Updated ${updated} part(s), skipped ${skipped}.`,
+                      color: "green",
+                    });
+                    await context.queryClient.invalidateQueries({
+                      queryKey: ["critical-components"],
+                    });
+                  } catch (err) {
+                    notifications.show({
+                      title: "Failed to recalculate lead times",
+                      message:
+                        err instanceof Error ? err.message : "Unknown error",
+                      color: "red",
+                    });
+                  } finally {
+                    setIsRecalculating(false);
+                  }
+                }}
+              >
+                <IconRefresh size={16} />
+              </ActionIcon>
             </Tooltip>
 
             {/* Export to Excel */}

@@ -46,6 +46,10 @@ export interface CriticalPart {
   // Stock check parameters
   stock_qty_check_days?: number | null;
   has_needs_check?: boolean;
+  // Lead time (days) from the 'leadtime' part parameter
+  lead_time?: number | null;
+  // Whether the lead time is manually managed ('leadtimemanual' parameter)
+  lead_time_manual?: boolean;
   // For "all" view
   category_id?: number | null;
   category_name?: string;

@@ -46,7 +46,7 @@ export function GroupRenderer({
         isLocationView={isLocationView}
       />
 
-      <Collapse in={isExpanded}>
+      <Collapse expanded={isExpanded}>
         {/* Parts directly in this group */}
         {hasParts && (
           <Box>

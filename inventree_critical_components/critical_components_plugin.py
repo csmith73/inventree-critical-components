@@ -27,7 +27,7 @@ class CriticalComponentsPlugin(
     SLUG = 'criticalcomponents'
     TITLE = 'Critical Components'
     DESCRIPTION = 'Track and display critical components organized by category'
-    VERSION = '1.2.6'
+    VERSION = '1.2.7'
     AUTHOR = 'InvenTree Critical Components Plugin'
     
     # Minimum InvenTree version required
@@ -71,6 +71,16 @@ class CriticalComponentsPlugin(
                 'stock-tracking/<int:stock_id>/',
                 api.StockTrackingView.as_view(),
                 name='stock-tracking',
+            ),
+            path(
+                'recalculate-lead-times/',
+                api.RecalculateLeadTimesView.as_view(),
+                name='recalculate-lead-times',
+            ),
+            path(
+                'set-lead-time/',
+                api.SetLeadTimeView.as_view(),
+                name='set-lead-time',
             ),
         ]
 
